@@ -7,14 +7,19 @@ on:
   workflow_dispatch:
     inputs:
       product:
-        description: Product ID to sync (all, xconnect, xworkmate)
+        description: Product ID to sync (all or specific product)
         required: false
         default: all
         type: choice
         options:
           - all
           - xconnect
+          - xconnect-one
+          - xconnect-gateway
+          - xconnect-edge-agent
+          - fluxgate
           - xworkmate
+          - xworkmate-remote-desktop
       channel:
         description: Release channel
         required: false

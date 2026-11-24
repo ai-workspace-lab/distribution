@@ -89,6 +89,41 @@ def load_matrix_for_product(
                 return json.loads(resp.read().decode("utf-8"))
         except (URLError, TimeoutError, json.JSONDecodeError, OSError):
             continue
+
+    repo_slug = product_cfg.get("repo")
+    if repo_slug:
+        try:
+            gh_url = f"https://api.github.com/repos/{repo_slug}/releases/latest"
+            req = Request(
+                gh_url,
+                headers={
+                    "User-Agent": "svc-plus-distribution/1.0",
+                    "Accept": "application/vnd.github+json",
+                },
+            )
+            with urlopen(req, timeout=8) as resp:
+                rel = json.loads(resp.read().decode("utf-8"))
+                tag = rel.get("tag_name")
+                if tag:
+                    return {
+                        "schemaVersion": 1,
+                        "product": product_id,
+                        "defaultChannel": product_cfg.get("default_channel", "latest"),
+                        "channels": {
+                            product_cfg.get("default_channel", "latest"): {
+                                "tag": tag,
+                                "version": str(tag).lstrip("v"),
+                                "channel": product_cfg.get("default_channel", "latest"),
+                                "publishedAt": rel.get("published_at"),
+                                "platforms": [
+                                    {"id": p, "packages": [{}]}
+                                    for p in (product_cfg.get("platforms") or [])
+                                ],
+                            }
+                        },
+                    }
+        except (URLError, TimeoutError, json.JSONDecodeError, OSError):
+            pass
     return None
 
 

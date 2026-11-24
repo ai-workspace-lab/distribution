@@ -37,7 +37,9 @@ mirrors:
 products:
   xconnect:
     id: xconnect
-    name: XConnect
+    name: XConnect-APP
+    aliases:
+      - xconnect-app
     category: desktop/mobile
     repo: ai-workspace-xstream/xconnect-app
     homepage: https://github.com/ai-workspace-xstream/xconnect-app
@@ -239,3 +241,187 @@ products:
         android:
           apk:
             - xworkmate-android-arm64.apk
+
+  xconnect-one:
+    id: xconnect-one
+    name: XConnect-One
+    category: cli/desktop
+    repo: ai-workspace-xstream/xconnect-one
+    homepage: https://github.com/ai-workspace-xstream/xconnect-one
+    summary: Unified AI workspace CLI, desktop app, and zero-lab runtime
+    publisher: svc.plus
+    license: Apache-2.0
+    default_channel: latest
+    channels:
+      - stable
+      - latest
+    platforms:
+      - macos
+      - windows
+      - linux
+    release_matrix_url: https://dl.svc.plus/releases/xconnect-one/release-matrix.json
+    cn_release_matrix_url: https://cn-dl.svc.plus/releases/xconnect-one/release-matrix.json
+    packages:
+      deb:
+        package_name: xconnect-one
+        architectures:
+          - amd64
+          - arm64
+        components:
+          - main
+        asset_patterns:
+          - xconnect-one_*_amd64.deb
+          - xconnect-one_*_arm64.deb
+      rpm:
+        package_name: xconnect-one
+        architectures:
+          - x86_64
+          - aarch64
+        asset_patterns:
+          - xconnect-one-*.x86_64.rpm
+          - xconnect-one-*.aarch64.rpm
+      homebrew:
+        tap: ai-workspace-lab/homebrew-tap
+        tap_alias: svc-plus/tap
+        cask_name: xconnect-one
+        app_name: XConnect-One.app
+        asset_patterns:
+          - xconnect-one-macos-arm64.dmg
+          - xconnect-one-macos-amd64.dmg
+      scoop:
+        bucket: ai-workspace-lab/scoop-bucket
+        bucket_alias: svc-plus
+        manifest_name: xconnect-one
+        asset_patterns:
+          - xconnect-one-windows-amd64.zip
+          - xconnect-one-windows-amd64.exe
+        bin:
+          - xconnect-one.exe
+      direct:
+        macos:
+          dmg:
+            - xconnect-one-macos-arm64.dmg
+            - xconnect-one-macos-amd64.dmg
+        windows:
+          zip:
+            - xconnect-one-windows-amd64.zip
+          exe:
+            - xconnect-one-windows-amd64.exe
+        linux:
+          deb:
+            - xconnect-one_*_amd64.deb
+            - xconnect-one_*_arm64.deb
+          rpm:
+            - xconnect-one-*.x86_64.rpm
+            - xconnect-one-*.aarch64.rpm
+          tar.gz:
+            - xconnect-one-linux-amd64.tar.gz
+            - xconnect-one-linux-arm64.tar.gz
+
+  xconnect-gateway:
+    id: xconnect-gateway
+    name: XConnect Gateway
+    category: server/cli
+    repo: ai-workspace-xstream/xconnect-gateway
+    homepage: https://github.com/ai-workspace-xstream/xconnect-gateway
+    summary: High-performance XConnect edge gateway service
+    publisher: svc.plus
+    license: Apache-2.0
+    default_channel: latest
+    channels:
+      - stable
+      - latest
+    platforms:
+      - linux
+    release_matrix_url: https://dl.svc.plus/releases/xconnect-gateway/release-matrix.json
+    cn_release_matrix_url: https://cn-dl.svc.plus/releases/xconnect-gateway/release-matrix.json
+    packages:
+      direct:
+        linux:
+          binary:
+            - xconnect-gateway-linux-amd64
+            - xconnect-gateway-linux-arm64
+
+  xconnect-edge-agent:
+    id: xconnect-edge-agent
+    name: XConnect Edge Agent
+    category: server/agent
+    repo: ai-workspace-xstream/xconnect-edge-agent
+    homepage: https://github.com/ai-workspace-xstream/xconnect-edge-agent
+    summary: Edge node runtime and Caddy control agent for XConnect
+    publisher: svc.plus
+    license: Apache-2.0
+    default_channel: latest
+    channels:
+      - stable
+      - latest
+    platforms:
+      - linux
+    release_matrix_url: https://dl.svc.plus/releases/xconnect-edge-agent/release-matrix.json
+    cn_release_matrix_url: https://cn-dl.svc.plus/releases/xconnect-edge-agent/release-matrix.json
+    packages:
+      direct:
+        linux:
+          binary:
+            - xconnect-edge-agent-linux-amd64
+            - xconnect-edge-agent-linux-arm64
+          tar.gz:
+            - artifact-amd64-*.tar.gz
+            - artifact-arm64-*.tar.gz
+
+  fluxgate:
+    id: fluxgate
+    name: Fluxgate
+    category: server/cli
+    repo: ai-workspace-xstream/fluxgate
+    homepage: https://github.com/ai-workspace-xstream/fluxgate
+    summary: Rust-based edge traffic gateway and proxy router
+    publisher: svc.plus
+    license: Apache-2.0
+    default_channel: latest
+    channels:
+      - stable
+      - latest
+    platforms:
+      - linux
+    release_matrix_url: https://dl.svc.plus/releases/fluxgate/release-matrix.json
+    cn_release_matrix_url: https://cn-dl.svc.plus/releases/fluxgate/release-matrix.json
+    packages:
+      direct:
+        linux:
+          binary:
+            - fluxgate-linux-amd64
+            - fluxgate-linux-arm64
+
+  xworkmate-remote-desktop:
+    id: xworkmate-remote-desktop
+    name: XWorkmate Remote Desktop
+    category: desktop/agent
+    repo: ai-desktop-lab/xworkmate-remote-desktop
+    homepage: https://github.com/ai-desktop-lab/xworkmate-remote-desktop
+    summary: Cross-platform remote desktop agent and WebRTC bridge for XWorkmate
+    publisher: ai-desktop-lab
+    license: Apache-2.0
+    default_channel: latest
+    channels:
+      - stable
+      - latest
+    platforms:
+      - macos
+      - windows
+      - linux
+    release_matrix_url: https://dl.svc.plus/releases/xworkmate-remote-desktop/release-matrix.json
+    cn_release_matrix_url: https://cn-dl.svc.plus/releases/xworkmate-remote-desktop/release-matrix.json
+    packages:
+      direct:
+        macos:
+          binary:
+            - xworkmate-remote-desktop-macos-arm64
+            - xworkmate-remote-desktop-macos-amd64
+        windows:
+          exe:
+            - xworkmate-remote-desktop-windows-amd64.exe
+        linux:
+          binary:
+            - xworkmate-remote-desktop-linux-amd64
+            - xworkmate-remote-desktop-linux-arm64

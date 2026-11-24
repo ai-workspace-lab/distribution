@@ -22,10 +22,10 @@ Usage:
   install.sh [options]
 
 Options:
-  --product <name>     Product to install: xconnect | xworkmate (default: xconnect)
+  --product <name>     Product to install: xconnect | xconnect-app | xconnect-one | xconnect-gateway | xconnect-edge-agent | fluxgate | xworkmate | xworkmate-remote-desktop (default: xconnect)
   --mirror <mode>      Mirror selection: auto | global | cn (default: auto)
   --channel <name>     Release channel: latest | stable (default: latest)
-  --method <mode>      Install method: auto | brew | dmg | apt | dnf | yum | deb | rpm | appimage | tar.gz
+  --method <mode>      Install method: auto | brew | dmg | apt | dnf | yum | deb | rpm | appimage | tar.gz | binary
   --setup-repo         Configure OS package repository / tap (APT, YUM/DNF, or Homebrew)
   --dry-run            Print planned actions and commands without modifying the system
   --no-verify          Skip SHA-256 checksum verification on direct downloads
@@ -170,9 +170,13 @@ while [ $# -gt 0 ]; do
 done
 
 case "$PRODUCT" in
-  xconnect|xworkmate) ;;
+  xconnect-app) PRODUCT="xconnect" ;;
+esac
+
+case "$PRODUCT" in
+  xconnect|xworkmate|xconnect-one|xconnect-gateway|xconnect-edge-agent|fluxgate|xworkmate-remote-desktop) ;;
   *)
-    die "Unsupported product '$PRODUCT'. Expected one of: xconnect, xworkmate"
+    die "Unsupported product '$PRODUCT'. Expected one of: xconnect, xconnect-app, xconnect-one, xconnect-gateway, xconnect-edge-agent, fluxgate, xworkmate, xworkmate-remote-desktop"
     ;;
 esac
 
@@ -545,6 +549,12 @@ install_direct_package() {
       tar -xzf "$dest_file" -C "${HOME}/.local/share/${PRODUCT}"
       log_info "Extracted ${asset_name} into ${HOME}/.local/share/${PRODUCT}"
       ;;
+    binary)
+      mkdir -p "${HOME}/.local/bin"
+      chmod +x "$dest_file"
+      cp "$dest_file" "${HOME}/.local/bin/${PRODUCT}"
+      log_info "Installed ${PRODUCT} binary to ${HOME}/.local/bin/${PRODUCT}"
+      ;;
     *)
       die "Unsupported direct package format: $fmt"
       ;;
@@ -592,20 +602,27 @@ fi
 
 EFFECTIVE_METHOD="$METHOD"
 if [ "$EFFECTIVE_METHOD" = "auto" ]; then
-  if [ "$TARGET_OS" = "macos" ]; then
-    if [ "$PKG_MGR" = "brew" ]; then
-      EFFECTIVE_METHOD="brew"
-    else
-      EFFECTIVE_METHOD="dmg"
-    fi
-  else
-    case "$PKG_MGR" in
-      apt) EFFECTIVE_METHOD="apt" ;;
-      dnf) EFFECTIVE_METHOD="dnf" ;;
-      yum) EFFECTIVE_METHOD="yum" ;;
-      *) EFFECTIVE_METHOD="tar.gz" ;;
-    esac
-  fi
+  case "$PRODUCT" in
+    xconnect-gateway|xconnect-edge-agent|fluxgate|xworkmate-remote-desktop)
+      EFFECTIVE_METHOD="binary"
+      ;;
+    *)
+      if [ "$TARGET_OS" = "macos" ]; then
+        if [ "$PKG_MGR" = "brew" ]; then
+          EFFECTIVE_METHOD="brew"
+        else
+          EFFECTIVE_METHOD="dmg"
+        fi
+      else
+        case "$PKG_MGR" in
+          apt) EFFECTIVE_METHOD="apt" ;;
+          dnf) EFFECTIVE_METHOD="dnf" ;;
+          yum) EFFECTIVE_METHOD="yum" ;;
+          *) EFFECTIVE_METHOD="tar.gz" ;;
+        esac
+      fi
+      ;;
+  esac
 fi
 
 case "$EFFECTIVE_METHOD" in
@@ -635,6 +652,9 @@ case "$EFFECTIVE_METHOD" in
     ;;
   tar.gz)
     install_direct_package "linux" "tar.gz" "$DL_BASE"
+    ;;
+  binary)
+    install_direct_package "$TARGET_OS" "binary" "$DL_BASE"
     ;;
   *)
     die "Unsupported install method '$EFFECTIVE_METHOD' for OS '$TARGET_OS'"

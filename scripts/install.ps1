@@ -14,7 +14,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("xconnect", "xworkmate")]
+    [ValidateSet("xconnect", "xconnect-app", "xconnect-one", "xworkmate", "xworkmate-remote-desktop")]
     [string]$Product = "xconnect",
 
     [ValidateSet("auto", "cn", "global")]
