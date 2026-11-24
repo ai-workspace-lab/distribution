@@ -1,0 +1,135 @@
+schemaVersion: 2
+
+upstreams:
+  files: []
+
+  npm:
+    upstream_registry: https://registry.npmjs.org
+    pull_through: true
+    packages: []
+    scopes:
+      - "@svc-plus"
+      - "@xworkmate"
+
+  github:
+    api_base_url: https://api.github.com
+    token_env: GITHUB_TOKEN
+    repos:
+      - repo: ai-workspace-xstream/xconnect-app
+        mirror_git: false
+        mirror_release: true
+        product_id: xconnect
+      - repo: ai-workspace-xstream/xconnect-one
+        mirror_git: false
+        mirror_release: true
+        product_id: xconnect-one
+      - repo: ai-workspace-xstream/xconnect-gateway
+        mirror_git: false
+        mirror_release: true
+        product_id: xconnect-gateway
+      - repo: ai-workspace-xstream/xconnect-edge-agent
+        mirror_git: false
+        mirror_release: true
+        product_id: xconnect-edge-agent
+      - repo: ai-workspace-xstream/fluxgate
+        mirror_git: false
+        mirror_release: true
+        product_id: fluxgate
+      - repo: ai-desktop-lab/xworkmate-remote-desktop
+        mirror_git: false
+        mirror_release: true
+        product_id: xworkmate-remote-desktop
+      - repo: ai-workspace-lab/homebrew-tap
+        mirror_git: true
+        mirror_release: false
+      - repo: ai-workspace-lab/scoop-bucket
+        mirror_git: true
+        mirror_release: false
+
+  oci:
+    # Mode: standalone (R2/OSS/Local OCI blobs) | harbor (sync to Harbor + 302 CDN) | hybrid (both)
+    mode: hybrid
+    harbor_url: ""
+    harbor_project: svc-plus
+    harbor_user_env: HARBOR_USER
+    harbor_password_env: HARBOR_PASSWORD
+    pull_through_enabled: true
+    registry_aliases:
+      ghcr: ghcr.io
+      docker: registry-1.docker.io
+      quay: quay.io
+      k8s: registry.k8s.io
+    mirrors: []
+
+  helm:
+    # Mode: oci | classic | dual
+    mode: dual
+    oci_project: svc-plus/charts
+    repos: []
+    oci_charts: []
+
+  apt:
+    distributions:
+      - stable
+      - bookworm
+      - trixie
+      - jammy
+      - noble
+    components:
+      - main
+    architectures:
+      - amd64
+      - arm64
+    signing_key_env: GPG_PRIVATE_KEY
+    ppas:
+      - name: svc-plus-ppa
+        owner: svc-plus
+        ppa_name: release
+        series:
+          - jammy
+          - noble
+        architectures:
+          - amd64
+          - arm64
+        dput_host: ppa.launchpad.net
+        mirror_enabled: false
+        submit_enabled: false
+    debian_repos:
+      - name: svc-plus-debian-buildd
+        base_url: ""
+        suites:
+          - bookworm
+          - trixie
+        components:
+          - main
+        architectures:
+          - amd64
+          - arm64
+        upload_host: mentors.debian.net
+        upload_method: https
+        mirror_enabled: false
+        submit_enabled: false
+
+  rpm:
+    signing_key_env: GPG_PRIVATE_KEY
+    obs:
+      - name: svc-plus-obs
+        api_base_url: https://api.opensuse.org
+        download_base: https://download.opensuse.org/repositories
+        project: home:svc-plus:release
+        repositories:
+          - Fedora_41
+          - openSUSE_Tumbleweed
+          - RHEL_9
+        architectures:
+          - x86_64
+          - aarch64
+        user_env: OBS_USER
+        password_env: OBS_PASSWORD
+        mirror_enabled: false
+        submit_enabled: false
+
+  winget:
+    source_identifier: SvcPlus.Distribution
+    rest_base_path: /winget/api
+    upstream_pr_repo: microsoft/winget-pkgs

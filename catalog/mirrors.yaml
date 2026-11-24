@@ -1,0 +1,32 @@
+schemaVersion: 2
+mirrorName: global
+publicUrl: https://repo.svc.plus
+dlUrl: https://dl.svc.plus
+cdnRedirect: true
+
+storage:
+  default: local
+  targets:
+    r2:
+      provider: cloudflare-r2
+      bucket: svc-plus-repo-global
+      endpoint: $R2_ENDPOINT
+      region: auto
+      public_base_url: https://repo.svc.plus
+      access_key_env: R2_ACCESS_KEY_ID
+      secret_key_env: R2_SECRET_ACCESS_KEY
+      force_path_style: true
+      worker_r2_binding: REPO_BUCKET
+    oss:
+      provider: aliyun-oss
+      bucket: svc-plus-repo-cn-hk
+      endpoint: $OSS_ENDPOINT
+      region: oss-cn-hongkong
+      public_base_url: https://cn-repo.svc.plus
+      access_key_env: OSS_ACCESS_KEY_ID
+      secret_key_env: OSS_ACCESS_KEY_SECRET
+      force_path_style: false
+    local:
+      provider: local
+      local_dir: ./dist-data
+      public_base_url: http://127.0.0.1:8080
