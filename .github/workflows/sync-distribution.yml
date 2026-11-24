@@ -345,9 +345,17 @@ jobs:
           accessKeySecret=${OSS_ACCESS_KEY_SECRET}
           EOF
           chmod 600 /tmp/.ossutilconfig
-          /tmp/ossutil-bin/ossutil-v1.7.19-linux-amd64/ossutil -c /tmp/.ossutilconfig \
-            sync dist/cn/ "oss://${OSS_BUCKET}/" --delete -f \
-            --meta "Cache-Control:public, max-age=60, must-revalidate"
+          OSSUTIL="/tmp/ossutil-bin/ossutil-v1.7.19-linux-amd64/ossutil"
+          for item in dist/cn/*; do
+            name="$(basename "$item")"
+            if [[ -d "$item" ]]; then
+              "$OSSUTIL" -c /tmp/.ossutilconfig cp -rf "$item/" "oss://${OSS_BUCKET}/${name}/" \
+                --meta "Cache-Control:public, max-age=60, must-revalidate"
+            elif [[ -f "$item" ]]; then
+              "$OSSUTIL" -c /tmp/.ossutilconfig cp -f "$item" "oss://${OSS_BUCKET}/${name}" \
+                --meta "Cache-Control:public, max-age=60, must-revalidate"
+            fi
+          done
           rm -f /tmp/.ossutilconfig
 
       - name: Upload distribution bundle artifact
