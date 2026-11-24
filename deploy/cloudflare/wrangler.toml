@@ -1,0 +1,19 @@
+name = "svc-plus-distribution-worker"
+main = "./build/worker.mjs"
+compatibility_date = "2025-05-01"
+
+[build]
+command = "go run github.com/syumai/workers-go/cmd/workers-assets-gen@v0.36.0 -mode=go && GOOS=js GOARCH=wasm go build -ldflags='-s -w' -o ./build/app.wasm ../../cmd/worker"
+
+[[r2_buckets]]
+binding = "REPO_BUCKET"
+bucket_name = "svc-plus-repo-global"
+
+[vars]
+MIRROR_NAME = "global"
+PUBLIC_URL = "https://repo.svc.plus"
+DL_URL = "https://dl.svc.plus"
+R2_BUCKET_BINDING = "REPO_BUCKET"
+R2_PUBLIC_BASE_URL = "https://repo.svc.plus"
+CDN_REDIRECT = "true"
+NPM_UPSTREAM = "https://registry.npmjs.org"

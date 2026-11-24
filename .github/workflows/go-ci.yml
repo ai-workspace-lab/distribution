@@ -1,0 +1,37 @@
+name: Go Distribution V2 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run Go unit & integration tests
+        run: go test -race -count=1 -v ./...
+
+      - name: Build single native binary (distd)
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o bin/distd ./cmd/distd
+
+      - name: Verify single binary CLI
+        run: ./bin/distd version
+
+      - name: Build Cloudflare Workers Go WASM target
+        run: GOOS=js GOARCH=wasm go build -trimpath -ldflags='-s -w' -o deploy/cloudflare/build/app.wasm ./cmd/worker && ls -lh deploy/cloudflare/build/app.wasm
+
+      - name: Run legacy Python/shell distribution tests
+        run: |
+          python3 -m pip install --no-cache-dir pyyaml
+          python3 -m unittest -v tests/test_distribution_scripts.py
