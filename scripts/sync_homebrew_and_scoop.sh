@@ -468,8 +468,8 @@ if [[ "$PUSH_GITHUB" == "true" ]]; then
   if [[ "$DRY_RUN" == "true" ]]; then
     echo "[dry-run] Skipping GitHub push for ai-workspace-lab/homebrew-tap and ai-workspace-lab/scoop-bucket."
   else
-    hb_token="${HOMEBREW_TAP_TOKEN:-${GITHUB_TOKEN:-}}"
-    sc_token="${SCOOP_BUCKET_TOKEN:-${GITHUB_TOKEN:-}}"
+    hb_token="${HOMEBREW_TAP_TOKEN:-}"
+    sc_token="${SCOOP_BUCKET_TOKEN:-}"
     push_repo_files "ai-workspace-lab/homebrew-tap" "$hb_token" "${OUTPUT_DIR%/}/global/homebrew/Casks" "Casks" "chore(cask): sync svc.plus casks"
     push_repo_files "ai-workspace-lab/scoop-bucket" "$sc_token" "${OUTPUT_DIR%/}/global/scoop/bucket" "bucket" "chore(scoop): sync svc.plus manifests"
   fi

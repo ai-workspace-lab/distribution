@@ -57,6 +57,7 @@ env:
 jobs:
   sync-distribution:
     runs-on: ubuntu-22.04
+    environment: prod
     steps:
       - name: Checkout distribution repository
         uses: actions/checkout@v4
@@ -88,21 +89,19 @@ jobs:
           jwtGithubAudience: vault
           ignoreNotFound: true
           secrets: |
-            kv/data/prod/platform/storage/cloudflare-r2 access_key_id | R2_ACCESS_KEY_ID ;
-            kv/data/prod/platform/storage/cloudflare-r2 secret_access_key | R2_SECRET_ACCESS_KEY ;
-            kv/data/prod/platform/storage/cloudflare-r2 endpoint | R2_ENDPOINT ;
-            kv/data/prod/platform/storage/aliyun-oss access_key_id | OSS_ACCESS_KEY_ID ;
-            kv/data/prod/platform/storage/aliyun-oss access_key_secret | OSS_ACCESS_KEY_SECRET ;
-            kv/data/prod/platform/storage/aliyun-oss endpoint | OSS_ENDPOINT ;
-            kv/data/github-actions/distribution R2_REPO_BUCKET | R2_REPO_BUCKET ;
-            kv/data/github-actions/distribution OSS_REPO_BUCKET | OSS_REPO_BUCKET ;
-            kv/data/github-actions/distribution APT_GPG_PRIVATE_KEY | APT_GPG_PRIVATE_KEY ;
-            kv/data/github-actions/distribution APT_GPG_KEY_ID | APT_GPG_KEY_ID ;
-            kv/data/github-actions/distribution APT_GPG_PASSPHRASE | APT_GPG_PASSPHRASE ;
-            kv/data/github-actions/distribution RPM_GPG_PRIVATE_KEY | RPM_GPG_PRIVATE_KEY ;
-            kv/data/github-actions/distribution RPM_GPG_KEY_ID | RPM_GPG_KEY_ID ;
-            kv/data/github-actions/distribution HOMEBREW_TAP_TOKEN | HOMEBREW_TAP_TOKEN ;
-            kv/data/github-actions/distribution SCOOP_BUCKET_TOKEN | SCOOP_BUCKET_TOKEN
+            kv/data/prod/platform/storage/cloudflare-r2-repo access_key_id | R2_ACCESS_KEY_ID ;
+            kv/data/prod/platform/storage/cloudflare-r2-repo secret_access_key | R2_SECRET_ACCESS_KEY ;
+            kv/data/prod/platform/storage/cloudflare-r2-repo bucket | R2_REPO_BUCKET ;
+            kv/data/prod/platform/storage/cloudflare-r2-repo endpoint | R2_ENDPOINT ;
+            kv/data/prod/platform/storage/aliyun-oss-repo access_key_id | OSS_ACCESS_KEY_ID ;
+            kv/data/prod/platform/storage/aliyun-oss-repo access_key_secret | OSS_ACCESS_KEY_SECRET ;
+            kv/data/prod/platform/storage/aliyun-oss-repo bucket | OSS_REPO_BUCKET ;
+            kv/data/prod/platform/storage/aliyun-oss-repo endpoint | OSS_ENDPOINT ;
+            kv/data/prod/platform/signing/svc-plus-repo-gpg gpg_private_key | GPG_PRIVATE_KEY ;
+            kv/data/prod/platform/signing/svc-plus-repo-gpg gpg_key_id | GPG_KEY_ID ;
+            kv/data/prod/platform/signing/svc-plus-repo-gpg gpg_passphrase | GPG_PASSPHRASE ;
+            kv/data/prod/platform/distribution/github-pat homebrew_tap_token | HOMEBREW_TAP_TOKEN ;
+            kv/data/prod/platform/distribution/github-pat scoop_bucket_token | SCOOP_BUCKET_TOKEN
 
       - name: Resolve dispatch parameters
         id: params
@@ -126,21 +125,15 @@ jobs:
       - name: Import GPG signing keys when configured
         id: gpg_setup
         env:
-          APT_GPG_PRIVATE_KEY: ${{ steps.vault.outputs.APT_GPG_PRIVATE_KEY }}
-          APT_GPG_KEY_ID: ${{ steps.vault.outputs.APT_GPG_KEY_ID }}
-          RPM_GPG_PRIVATE_KEY: ${{ steps.vault.outputs.RPM_GPG_PRIVATE_KEY }}
-          RPM_GPG_KEY_ID: ${{ steps.vault.outputs.RPM_GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ steps.vault.outputs.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ steps.vault.outputs.GPG_KEY_ID }}
         run: |
-          if [[ -n "${APT_GPG_PRIVATE_KEY:-}" ]]; then
-            printf '%s\n' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          if [[ -n "${GPG_PRIVATE_KEY:-}" ]]; then
+            printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
             echo "apt_signed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "apt_signed=false" >> "$GITHUB_OUTPUT"
-          fi
-          if [[ -n "${RPM_GPG_PRIVATE_KEY:-}" ]]; then
-            printf '%s\n' "$RPM_GPG_PRIVATE_KEY" | gpg --batch --import
             echo "rpm_signed=true" >> "$GITHUB_OUTPUT"
           else
+            echo "apt_signed=false" >> "$GITHUB_OUTPUT"
             echo "rpm_signed=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -176,9 +169,8 @@ jobs:
 
       - name: Download DEB and RPM release packages and build OS repos
         env:
-          APT_GPG_KEY_ID: ${{ steps.vault.outputs.APT_GPG_KEY_ID }}
-          APT_GPG_PASSPHRASE: ${{ steps.vault.outputs.APT_GPG_PASSPHRASE }}
-          RPM_GPG_KEY_ID: ${{ steps.vault.outputs.RPM_GPG_KEY_ID }}
+          GPG_KEY_ID: ${{ steps.vault.outputs.GPG_KEY_ID }}
+          GPG_PASSPHRASE: ${{ steps.vault.outputs.GPG_PASSPHRASE }}
         run: |
           mkdir -p staging/debs staging/rpms
           if [[ "${{ steps.params.outputs.sync_packages }}" == "true" ]]; then
@@ -235,11 +227,12 @@ jobs:
               apt_args+=(--dry-run)
               rpm_args+=(--dry-run)
             else
-              if [[ -n "${APT_GPG_KEY_ID:-}" ]]; then
-                apt_args+=(--gpg-key-id "$APT_GPG_KEY_ID")
-              fi
-              if [[ -n "${RPM_GPG_KEY_ID:-}" ]]; then
-                rpm_args+=(--gpg-key-id "$RPM_GPG_KEY_ID")
+              if [[ -n "${GPG_KEY_ID:-}" ]]; then
+                apt_args+=(--gpg-key-id "$GPG_KEY_ID")
+                rpm_args+=(--gpg-key-id "$GPG_KEY_ID")
+                mkdir -p "dist/${mirror}/keys"
+                gpg --armor --export "$GPG_KEY_ID" > "dist/${mirror}/keys/svc-plus-archive-keyring.asc"
+                gpg --export "$GPG_KEY_ID" > "dist/${mirror}/keys/svc-plus-archive-keyring.gpg"
               fi
             fi
 
