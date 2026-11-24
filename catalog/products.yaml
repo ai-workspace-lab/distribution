@@ -1,0 +1,241 @@
+schemaVersion: 1
+
+mirrors:
+  dl: https://dl.svc.plus
+  cn_dl: https://cn-dl.svc.plus
+  repo: https://repo.svc.plus
+  cn_repo: https://cn-repo.svc.plus
+  github: https://github.com
+  regions:
+    global:
+      label: Global (Cloudflare R2)
+      dl: https://dl.svc.plus
+      repo: https://repo.svc.plus
+      homebrew_tap_repo: ai-workspace-lab/homebrew-tap
+      homebrew_tap_url: https://github.com/ai-workspace-lab/homebrew-tap.git
+      homebrew_tap_http: https://repo.svc.plus/homebrew/tap.git
+      scoop_bucket_repo: ai-workspace-lab/scoop-bucket
+      scoop_bucket_url: https://github.com/ai-workspace-lab/scoop-bucket.git
+      scoop_bucket_http: https://repo.svc.plus/scoop/bucket.git
+      storage:
+        provider: cloudflare-r2
+        bucket: svc-plus-repo-global
+    cn:
+      label: China / HK (Aliyun OSS)
+      dl: https://cn-dl.svc.plus
+      repo: https://cn-repo.svc.plus
+      homebrew_tap_repo: ai-workspace-lab/homebrew-tap
+      homebrew_tap_url: https://cn-repo.svc.plus/homebrew/tap.git
+      homebrew_tap_http: https://cn-repo.svc.plus/homebrew/tap.git
+      scoop_bucket_repo: ai-workspace-lab/scoop-bucket
+      scoop_bucket_url: https://cn-repo.svc.plus/scoop/bucket.git
+      scoop_bucket_http: https://cn-repo.svc.plus/scoop/bucket.git
+      storage:
+        provider: aliyun-oss
+        bucket: svc-plus-repo-cn-hk
+
+products:
+  xconnect:
+    id: xconnect
+    name: XConnect
+    category: desktop/mobile
+    repo: ai-workspace-xstream/xconnect-app
+    homepage: https://github.com/ai-workspace-xstream/xconnect-app
+    summary: Cross-platform secure connectivity and workspace client
+    publisher: svc.plus
+    license: Apache-2.0
+    default_channel: latest
+    channels:
+      - stable
+      - latest
+    platforms:
+      - macos
+      - windows
+      - linux
+      - android
+      - ios
+    release_matrix_url: https://dl.svc.plus/releases/xconnect/release-matrix.json
+    cn_release_matrix_url: https://cn-dl.svc.plus/releases/xconnect/release-matrix.json
+    packages:
+      deb:
+        package_name: xconnect
+        architectures:
+          - amd64
+          - arm64
+        components:
+          - main
+        asset_patterns:
+          - xconnect-linux-amd64.deb
+          - xconnect-linux-arm64.deb
+          - xconnect_*_amd64.deb
+          - xconnect_*_arm64.deb
+      rpm:
+        package_name: xconnect
+        architectures:
+          - x86_64
+          - aarch64
+        asset_patterns:
+          - xconnect-linux-x86_64.rpm
+          - xconnect-linux-aarch64.rpm
+          - xconnect-*.x86_64.rpm
+          - xconnect-*.aarch64.rpm
+      homebrew:
+        tap: ai-workspace-lab/homebrew-tap
+        tap_alias: svc-plus/tap
+        cask_name: xconnect
+        app_name: XConnect.app
+        asset_patterns:
+          - xconnect.dmg
+          - xconnect-release-*.dmg
+        zap:
+          - ~/Library/Application Support/plus.svc.xconnect
+          - ~/Library/Caches/plus.svc.xconnect
+          - ~/Library/Preferences/plus.svc.xconnect.plist
+          - ~/Library/Saved Application State/plus.svc.xconnect.savedState
+      scoop:
+        bucket: ai-workspace-lab/scoop-bucket
+        bucket_alias: svc-plus
+        manifest_name: xconnect
+        asset_patterns:
+          - xconnect-windows.zip
+          - xconnect-windows-portable.exe
+        bin:
+          - xconnect.exe
+        shortcuts:
+          - - xconnect.exe
+            - XConnect
+      winget:
+        identifier: SvcPlus.XConnect
+        moniker: xconnect
+        publisher: svc.plus
+        installer_type: msi
+        asset_patterns:
+          - xconnect-windows.msi
+          - xconnect-windows-portable.exe
+      direct:
+        macos:
+          dmg:
+            - xconnect.dmg
+            - xconnect-release-*.dmg
+        windows:
+          msi:
+            - xconnect-windows.msi
+          exe:
+            - xconnect-windows-portable.exe
+          zip:
+            - xconnect-windows.zip
+        linux:
+          deb:
+            - xconnect-linux-amd64.deb
+          rpm:
+            - xconnect-linux-x86_64.rpm
+          appimage:
+            - xconnect-linux.AppImage
+          tar.gz:
+            - xconnect-linux-x64.tar.gz
+          zip:
+            - xconnect-linux.zip
+        android:
+          apk:
+            - app-release.apk
+        ios:
+          ipa:
+            - xconnect.ipa
+
+  xworkmate:
+    id: xworkmate
+    name: XWorkmate
+    category: desktop/mobile
+    repo: ai-workspace-lab/xworkmate-app
+    homepage: https://github.com/ai-workspace-lab/xworkmate-app
+    summary: Desktop-first AI workspace shell
+    publisher: ai-workspace-lab
+    license: Apache-2.0
+    default_channel: stable
+    channels:
+      - stable
+      - latest
+    platforms:
+      - macos
+      - windows
+      - linux
+      - android
+    release_matrix_url: https://dl.svc.plus/releases/xworkmate/release-matrix.json
+    cn_release_matrix_url: https://cn-dl.svc.plus/releases/xworkmate/release-matrix.json
+    packages:
+      deb:
+        package_name: xworkmate
+        architectures:
+          - amd64
+          - arm64
+        components:
+          - main
+        asset_patterns:
+          - xworkmate_*_amd64.deb
+          - xworkmate-linux-amd64.deb
+          - xworkmate_*_arm64.deb
+          - xworkmate-linux-arm64.deb
+      rpm:
+        package_name: xworkmate
+        architectures:
+          - x86_64
+          - aarch64
+        asset_patterns:
+          - xworkmate-*.x86_64.rpm
+          - xworkmate-linux-x86_64.rpm
+          - xworkmate-*.aarch64.rpm
+          - xworkmate-linux-aarch64.rpm
+      homebrew:
+        tap: ai-workspace-lab/homebrew-tap
+        tap_alias: svc-plus/tap
+        cask_name: xworkmate
+        app_name: XWorkmate.app
+        asset_patterns:
+          - XWorkmate-*.dmg
+          - xworkmate*.dmg
+        zap:
+          - ~/Library/Application Support/plus.svc.xworkmate
+          - ~/Library/Caches/plus.svc.xworkmate
+          - ~/Library/Preferences/plus.svc.xworkmate.plist
+          - ~/Library/Saved Application State/plus.svc.xworkmate.savedState
+      scoop:
+        bucket: ai-workspace-lab/scoop-bucket
+        bucket_alias: svc-plus
+        manifest_name: xworkmate
+        asset_patterns:
+          - xworkmate-windows-amd64.zip
+          - xworkmate-windows.zip
+          - xworkmate-windows-portable.exe
+        bin:
+          - xworkmate.exe
+        shortcuts:
+          - - xworkmate.exe
+            - XWorkmate
+      winget:
+        identifier: SvcPlus.XWorkmate
+        moniker: xworkmate
+        publisher: ai-workspace-lab
+        installer_type: msi
+        asset_patterns:
+          - xworkmate-windows*.msi
+          - xworkmate-windows*.exe
+      direct:
+        macos:
+          dmg:
+            - XWorkmate-*.dmg
+            - xworkmate*.dmg
+        windows:
+          zip:
+            - xworkmate-windows-amd64.zip
+          msi:
+            - xworkmate-windows*.msi
+          exe:
+            - xworkmate-windows*.exe
+        linux:
+          deb:
+            - xworkmate_*_amd64.deb
+          rpm:
+            - xworkmate-*.x86_64.rpm
+        android:
+          apk:
+            - xworkmate-android-arm64.apk

@@ -1,0 +1,365 @@
+name: Sync Distribution Repositories
+
+on:
+  repository_dispatch:
+    types:
+      - product-release
+  workflow_dispatch:
+    inputs:
+      product:
+        description: Product ID to sync (all, xconnect, xworkmate)
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - xconnect
+          - xworkmate
+      channel:
+        description: Release channel
+        required: false
+        default: latest
+        type: choice
+        options:
+          - latest
+          - stable
+      sync_packages:
+        description: Download and rebuild APT/RPM binary repositories
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: Run in dry-run preview mode without syncing buckets or pushing taps
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - catalog/**
+      - scripts/**
+      - .github/workflows/sync-distribution.yml
+
+concurrency:
+  group: distribution-repo-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  VAULT_ADDR: https://vault.svc.plus
+  R2_REPO_BUCKET_DEFAULT: svc-plus-repo-global
+  OSS_REPO_BUCKET_DEFAULT: svc-plus-repo-cn-hk
+
+jobs:
+  sync-distribution:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout distribution repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: python3 -m pip install --no-cache-dir pyyaml
+
+      - name: Install OS packaging & cloud CLI tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev createrepo-c rpm gnupg awscli unzip curl git
+
+      - name: Run distribution script test suite
+        run: python3 -m unittest -v tests/test_distribution_scripts.py
+
+      - name: Load Vault secrets (storage, GPG signing, tap PATs)
+        id: vault
+        continue-on-error: true
+        uses: hashicorp/vault-action@v4
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-distribution-prod
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/prod/platform/storage/cloudflare-r2 access_key_id | R2_ACCESS_KEY_ID ;
+            kv/data/prod/platform/storage/cloudflare-r2 secret_access_key | R2_SECRET_ACCESS_KEY ;
+            kv/data/prod/platform/storage/cloudflare-r2 endpoint | R2_ENDPOINT ;
+            kv/data/prod/platform/storage/aliyun-oss access_key_id | OSS_ACCESS_KEY_ID ;
+            kv/data/prod/platform/storage/aliyun-oss access_key_secret | OSS_ACCESS_KEY_SECRET ;
+            kv/data/prod/platform/storage/aliyun-oss endpoint | OSS_ENDPOINT ;
+            kv/data/github-actions/distribution R2_REPO_BUCKET | R2_REPO_BUCKET ;
+            kv/data/github-actions/distribution OSS_REPO_BUCKET | OSS_REPO_BUCKET ;
+            kv/data/github-actions/distribution APT_GPG_PRIVATE_KEY | APT_GPG_PRIVATE_KEY ;
+            kv/data/github-actions/distribution APT_GPG_KEY_ID | APT_GPG_KEY_ID ;
+            kv/data/github-actions/distribution APT_GPG_PASSPHRASE | APT_GPG_PASSPHRASE ;
+            kv/data/github-actions/distribution RPM_GPG_PRIVATE_KEY | RPM_GPG_PRIVATE_KEY ;
+            kv/data/github-actions/distribution RPM_GPG_KEY_ID | RPM_GPG_KEY_ID ;
+            kv/data/github-actions/distribution HOMEBREW_TAP_TOKEN | HOMEBREW_TAP_TOKEN ;
+            kv/data/github-actions/distribution SCOOP_BUCKET_TOKEN | SCOOP_BUCKET_TOKEN
+
+      - name: Resolve dispatch parameters
+        id: params
+        shell: bash
+        run: |
+          product="${{ github.event.inputs.product || github.event.client_payload.product || 'all' }}"
+          channel="${{ github.event.inputs.channel || github.event.client_payload.channel || 'latest' }}"
+          sync_packages="${{ github.event.inputs.sync_packages || github.event.client_payload.sync_packages || 'true' }}"
+          dry_run="${{ github.event.inputs.dry_run || 'false' }}"
+          if [[ "$product" == "all" ]]; then
+            products_csv=""
+          else
+            products_csv="$product"
+          fi
+          echo "product=${product}" >> "$GITHUB_OUTPUT"
+          echo "products_csv=${products_csv}" >> "$GITHUB_OUTPUT"
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          echo "sync_packages=${sync_packages}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${dry_run}" >> "$GITHUB_OUTPUT"
+
+      - name: Import GPG signing keys when configured
+        id: gpg_setup
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ steps.vault.outputs.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_KEY_ID: ${{ steps.vault.outputs.APT_GPG_KEY_ID }}
+          RPM_GPG_PRIVATE_KEY: ${{ steps.vault.outputs.RPM_GPG_PRIVATE_KEY }}
+          RPM_GPG_KEY_ID: ${{ steps.vault.outputs.RPM_GPG_KEY_ID }}
+        run: |
+          if [[ -n "${APT_GPG_PRIVATE_KEY:-}" ]]; then
+            printf '%s\n' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+            echo "apt_signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apt_signed=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -n "${RPM_GPG_PRIVATE_KEY:-}" ]]; then
+            printf '%s\n' "$RPM_GPG_PRIVATE_KEY" | gpg --batch --import
+            echo "rpm_signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rpm_signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish static sites for Global and CN mirrors
+        run: |
+          python3 scripts/publish_static_site.py \
+            --catalog catalog/products.yaml \
+            --output-dir dist \
+            --mirrors global,cn \
+            --fetch-matrices
+
+      - name: Sync Homebrew Casks, Scoop manifests, and Dumb-HTTP git repos
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ steps.vault.outputs.HOMEBREW_TAP_TOKEN }}
+          SCOOP_BUCKET_TOKEN: ${{ steps.vault.outputs.SCOOP_BUCKET_TOKEN }}
+        run: |
+          args=(
+            --catalog catalog/products.yaml
+            --output-dir dist
+            --channel "${{ steps.params.outputs.channel }}"
+            --mirrors global,cn
+          )
+          if [[ -n "${{ steps.params.outputs.products_csv }}" ]]; then
+            args+=(--products "${{ steps.params.outputs.products_csv }}")
+          fi
+          if [[ "${{ steps.params.outputs.dry_run }}" == "true" ]]; then
+            args+=(--dry-run)
+          else
+            args+=(--push-github)
+          fi
+          bash scripts/sync_homebrew_and_scoop.sh "${args[@]}"
+
+      - name: Download DEB and RPM release packages and build OS repos
+        env:
+          APT_GPG_KEY_ID: ${{ steps.vault.outputs.APT_GPG_KEY_ID }}
+          APT_GPG_PASSPHRASE: ${{ steps.vault.outputs.APT_GPG_PASSPHRASE }}
+          RPM_GPG_KEY_ID: ${{ steps.vault.outputs.RPM_GPG_KEY_ID }}
+        run: |
+          mkdir -p staging/debs staging/rpms
+          if [[ "${{ steps.params.outputs.sync_packages }}" == "true" ]]; then
+            python3 - <<'PYEOF'
+          import json
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          import yaml
+
+          catalog = yaml.safe_load(Path("catalog/products.yaml").read_text(encoding="utf-8"))
+          for pid, pcfg in catalog["products"].items():
+              url = pcfg.get("release_matrix_url")
+              if not url:
+                  continue
+              try:
+                  with urlopen(Request(url, headers={"User-Agent": "svc-plus-distribution/1.0"}), timeout=15) as resp:
+                      matrix = json.loads(resp.read().decode("utf-8"))
+              except Exception as exc:
+                  print(f"Skipping package download for {pid}: {exc}")
+                  continue
+              channels = matrix.get("channels") or {}
+              entry = channels.get(pcfg.get("default_channel", "latest")) or channels.get("latest") or channels.get("stable")
+              if not entry:
+                  continue
+              for plat in entry.get("platforms") or []:
+                  if plat.get("id") != "linux":
+                      continue
+                  for pkg in plat.get("packages") or []:
+                      fmt = pkg.get("format")
+                      if fmt not in {"deb", "rpm"}:
+                          continue
+                      dl_url = pkg.get("githubUrl") or f"https://dl.svc.plus{pkg.get('path', '')}"
+                      out_dir = Path("staging/debs" if fmt == "deb" else "staging/rpms") / pid
+                      out_dir.mkdir(parents=True, exist_ok=True)
+                      dest = out_dir / pkg["name"]
+                      try:
+                          with urlopen(Request(dl_url, headers={"User-Agent": "svc-plus-distribution/1.0"}), timeout=120) as r:
+                              dest.write_bytes(r.read())
+                          print(f"Downloaded {dest}")
+                      except Exception as exc:
+                          print(f"Failed downloading {dl_url}: {exc}")
+          PYEOF
+          fi
+
+          for mirror in global cn; do
+            mirror_url="https://repo.svc.plus"
+            if [[ "$mirror" == "cn" ]]; then
+              mirror_url="https://cn-repo.svc.plus"
+            fi
+
+            apt_args=(--source-debs staging/debs --output-dir "dist/${mirror}")
+            rpm_args=(--source-rpms staging/rpms --output-dir "dist/${mirror}" --mirror-url "$mirror_url")
+            if [[ "${{ steps.params.outputs.dry_run }}" == "true" ]]; then
+              apt_args+=(--dry-run)
+              rpm_args+=(--dry-run)
+            else
+              if [[ -n "${APT_GPG_KEY_ID:-}" ]]; then
+                apt_args+=(--gpg-key-id "$APT_GPG_KEY_ID")
+              fi
+              if [[ -n "${RPM_GPG_KEY_ID:-}" ]]; then
+                rpm_args+=(--gpg-key-id "$RPM_GPG_KEY_ID")
+              fi
+            fi
+
+            bash scripts/build_apt_repo.sh "${apt_args[@]}"
+            bash scripts/build_rpm_repo.sh "${rpm_args[@]}"
+          done
+
+      - name: Generate WinGet 1.6+ manifests from release matrices
+        run: |
+          python3 - <<'PYEOF'
+          import json
+          from pathlib import Path
+          import subprocess
+          from urllib.request import Request, urlopen
+          import yaml
+
+          catalog = yaml.safe_load(Path("catalog/products.yaml").read_text(encoding="utf-8"))
+          for mirror, dl_key in [("global", "dl"), ("cn", "cn_dl")]:
+              dl_base = catalog["mirrors"][dl_key].rstrip("/")
+              out_dir = Path("dist") / mirror / "winget"
+              for pid, pcfg in catalog["products"].items():
+                  wg = (pcfg.get("packages") or {}).get("winget") or {}
+                  matrix_url = pcfg.get("release_matrix_url")
+                  if not wg or not matrix_url:
+                      continue
+                  try:
+                      with urlopen(Request(matrix_url, headers={"User-Agent": "svc-plus-distribution/1.0"}), timeout=15) as resp:
+                          matrix = json.loads(resp.read().decode("utf-8"))
+                  except Exception:
+                      continue
+                  channels = matrix.get("channels") or {}
+                  entry = channels.get(pcfg.get("default_channel", "latest")) or channels.get("latest") or channels.get("stable")
+                  if not entry:
+                      continue
+                  win_pkgs = []
+                  for plat in entry.get("platforms") or []:
+                      if plat.get("id") == "windows":
+                          win_pkgs = plat.get("packages") or []
+                          break
+                  inst_pkg = next((p for p in win_pkgs if p.get("format") in {"msi", "exe"} and p.get("sha256")), None)
+                  if not inst_pkg:
+                      continue
+                  mirrors_state = entry.get("mirrors") or {}
+                  if mirror == "cn" and (mirrors_state.get("cn") or {}).get("synced") and inst_pkg.get("path"):
+                      url = f"{dl_base}{inst_pkg['path']}"
+                  elif (mirrors_state.get("global") or {}).get("synced") and inst_pkg.get("path"):
+                      url = f"https://dl.svc.plus{inst_pkg['path']}"
+                  else:
+                      url = inst_pkg.get("githubUrl", "")
+                  if not url:
+                      continue
+                  subprocess.run(
+                      [
+                          "python3",
+                          "scripts/build_winget_manifest.py",
+                          "--identifier", wg["identifier"],
+                          "--version", str(entry.get("version") or "0.0.0"),
+                          "--publisher", str(wg.get("publisher") or pcfg.get("publisher") or "svc.plus"),
+                          "--package-name", str(pcfg.get("name") or pid),
+                          "--short-description", str(pcfg.get("summary") or pid),
+                          "--license", str(pcfg.get("license") or "Apache-2.0"),
+                          "--package-url", str(pcfg.get("homepage") or ""),
+                          "--moniker", str(wg.get("moniker") or pid),
+                          "--installer-url", url,
+                          "--installer-sha256", inst_pkg["sha256"],
+                          "--output-dir", str(out_dir),
+                      ],
+                      check=True,
+                  )
+          PYEOF
+
+      - name: Sync Global distribution output to Cloudflare R2 (svc-plus-repo-global)
+        if: ${{ steps.params.outputs.dry_run != 'true' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.vault.outputs.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.vault.outputs.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ steps.vault.outputs.R2_ENDPOINT }}
+          R2_BUCKET: ${{ steps.vault.outputs.R2_REPO_BUCKET || env.R2_REPO_BUCKET_DEFAULT }}
+        run: |
+          if [[ -z "${AWS_ACCESS_KEY_ID:-}" || -z "${AWS_SECRET_ACCESS_KEY:-}" || -z "${R2_ENDPOINT:-}" ]]; then
+            echo "::warning title=R2 Repo Sync::Cloudflare R2 credentials not populated in Vault; skipped sync to ${R2_BUCKET}."
+            exit 0
+          fi
+          aws s3 sync dist/global/ "s3://${R2_BUCKET}/" \
+            --endpoint-url "${R2_ENDPOINT}" \
+            --delete \
+            --cache-control "public, max-age=60, must-revalidate"
+
+      - name: Sync CN distribution output to Aliyun HK OSS (svc-plus-repo-cn-hk)
+        if: ${{ steps.params.outputs.dry_run != 'true' }}
+        env:
+          OSS_ACCESS_KEY_ID: ${{ steps.vault.outputs.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ steps.vault.outputs.OSS_ACCESS_KEY_SECRET }}
+          OSS_ENDPOINT: ${{ steps.vault.outputs.OSS_ENDPOINT }}
+          OSS_BUCKET: ${{ steps.vault.outputs.OSS_REPO_BUCKET || env.OSS_REPO_BUCKET_DEFAULT }}
+        run: |
+          if [[ -z "${OSS_ACCESS_KEY_ID:-}" || -z "${OSS_ACCESS_KEY_SECRET:-}" || -z "${OSS_ENDPOINT:-}" ]]; then
+            echo "::warning title=OSS Repo Sync::Aliyun OSS credentials not populated in Vault; skipped sync to ${OSS_BUCKET}."
+            exit 0
+          fi
+          curl -fsSL "https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-linux-amd64.zip" -o /tmp/ossutil.zip
+          unzip -oq /tmp/ossutil.zip -d /tmp/ossutil-bin
+          chmod +x /tmp/ossutil-bin/ossutil-v1.7.19-linux-amd64/ossutil
+          cat > /tmp/.ossutilconfig <<EOF
+          [Credentials]
+          language=EN
+          endpoint=${OSS_ENDPOINT}
+          accessKeyID=${OSS_ACCESS_KEY_ID}
+          accessKeySecret=${OSS_ACCESS_KEY_SECRET}
+          EOF
+          chmod 600 /tmp/.ossutilconfig
+          /tmp/ossutil-bin/ossutil-v1.7.19-linux-amd64/ossutil -c /tmp/.ossutilconfig \
+            sync dist/cn/ "oss://${OSS_BUCKET}/" --delete -f \
+            --meta "Cache-Control:public, max-age=60, must-revalidate"
+          rm -f /tmp/.ossutilconfig
+
+      - name: Upload distribution bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: distribution-dist-${{ steps.params.outputs.product }}-${{ github.run_id }}
+          path: dist/
+          retention-days: 14
